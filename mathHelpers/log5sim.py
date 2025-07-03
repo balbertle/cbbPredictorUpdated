@@ -1,17 +1,15 @@
-# simulator.py
 import numpy as np
-import csv # Needed to create the dummy CSV
+
 from scipy.stats import norm
 
-# Import our new and updated functions
+
 from helpers.getTeams import getTeams
 from helpers.findTeam import findTeam 
 from helperFunctions import data
 from helpers.prepare_stats import prepare_team_stats, calculate_league_averages
 from mathHelpers.log5 import calculate_four_factors_probabilities
 
-# --- All the simulation and matrix creation functions are unchanged ---
-# (points_per_state, create_transition_matrix, simulate_game, simulate_matchup)
+
 points_per_state = {
     'Start': 0, 'Make 2': 2, 'Make 3': 3, 'Missed Shot': 0, 'Turnover': 0, 'Offensive Rebound': 0,
     'Shooting Foul 2-Shots': 0, 'Shooting Foul 3-Shots': 0, 'FT 1-of-2': 0, 'FT 2-of-2': 1,
@@ -47,14 +45,9 @@ def simulate_game(team1_matrix, team2_matrix, num_possessions, max_steps_per_pos
             row = transition_matrix[state_index[current_state]]; current_state = np.random.choice(states, p=row); steps += 1
         total_state_counts['End'] += 1; team_points[current_team_idx] += points_per_state.get(current_state, 0); current_team_idx = 3 - current_team_idx
     return team_points[1], team_points[2], total_state_counts
-# In log5sim.py (or your main simulator file)
-
-# ... (keep all your other functions like create_transition_matrix, simulate_game, etc.) ...
 
 import numpy as np
-# ... other necessary imports
 
-# --- ADD THIS NEW HELPER FUNCTION FOR BARTHAG ---
 def get_barthag_win_prob(barthag1, barthag2):
     """
     Calculates the win probability between two teams based on their BARTHAG ratings
@@ -63,7 +56,7 @@ def get_barthag_win_prob(barthag1, barthag2):
     # The Log5 formula: P(A wins) = (A - A*B) / (A + B - 2*A*B)
     denominator = barthag1 + barthag2 - 2 * barthag1 * barthag2
     if denominator == 0:
-        return 0.5 # If ratings are identical (both 0 or 1), it's a toss-up
+        return 0.5
     return (barthag1 - barthag1 * barthag2) / denominator
 
 
@@ -72,9 +65,10 @@ def simulate_matchup(
     team2_name, team2_stats, 
     league_averages, 
     exponent, 
-    pythag_weight=0.20,
-    barthag_weight=0.10,
-    num_simulations=5000):
+    pythag_weight=0.10,
+    barthag_weight=0,
+    num_simulations=500
+):
     print(f"\nSimulating matchup: {team1_name} vs {team2_name}")
     possessions = (team1_stats["poss_per_g"] + team2_stats["poss_per_g"]) / 2
     
@@ -84,14 +78,13 @@ def simulate_matchup(
     team1_matrix = create_transition_matrix(team1_probs)
     team2_matrix = create_transition_matrix(team2_probs)
     
-    # --- Store full results for accurate analysis ---
     team1_scores = []
     team2_scores = []
     score_diffs = []
 
     print(f"Running {num_simulations} simulations...")
     for i in range(num_simulations):
-        if (i + 1) % 1000 == 0:
+        if (i + 1) % 100 == 0 or i == num_simulations - 1:
             print(f"\r  Simulation {i + 1}/{num_simulations}", end="")
             
         score1, score2, _ = simulate_game(team1_matrix, team2_matrix, possessions)
@@ -100,24 +93,30 @@ def simulate_matchup(
         team2_scores.append(score2)
         score_diffs.append(score1 - score2)
     
-    print(f"\r  Simulation Complete.                  ")
+    print(f"\r  Simulation Complete.                         ")
 
-    # 1. Calculate average scores directly from the lists.
-    team1_avg = np.mean(team1_scores)
-    team2_avg = np.mean(team2_scores)
-    p_win_log5 = sum(1 for diff in score_diffs if diff > 0) / num_simulations
-    p_win_pythag = get_pythagorean_win_prob(team1_stats, team2_stats, exponent, league_averages)
-    p_win_barthag = get_barthag_win_prob(team1_stats['BARTHAG'], team2_stats['BARTHAG'])
-    log5_weight = 1.0 - pythag_weight - barthag_weight
+    # --- Calculate All Probabilities ---
     
-    # 2. blend results
+    # 1. Probability from the detailed simulation
+    p_win_log5 = sum(1 for diff in score_diffs if diff > 0) / num_simulations
+    
+    # 2. Probability from Pythagorean Expectation
+    p_win_pythag = get_pythagorean_win_prob(team1_stats, team2_stats, exponent, league_averages)
+    
+    # 3. Probability from BARTHAG rating
+    p_win_barthag = get_barthag_win_prob(team1_stats['BARTHAG'], team2_stats['BARTHAG'])
+    
+    # --- Blend the results ---
+    log5_weight = 1.0 - pythag_weight - barthag_weight
     final_win_prob = (
         (p_win_log5 * log5_weight) + 
         (p_win_pythag * pythag_weight) + 
         (p_win_barthag * barthag_weight)
     )
 
-    # 3. Calculate the average score differential (the spread).
+    # --- Calculate Final Averages ---
+    team1_avg = np.mean(team1_scores)
+    team2_avg = np.mean(team2_scores)
     spread_mean = np.mean(score_diffs)
     
     # --- Print Corrected and Consistent Results ---
@@ -126,15 +125,17 @@ def simulate_matchup(
     print(f"{team1_name} Win Probability: {final_win_prob:.2%}")
 
     print("\n--- Betting Market Analysis ---")
-    # FIX: The spread is printed directly. A positive value means team1 is favored.
-    # A negative value means team2 is favored.
-    print(f"Predicted Spread: {team1_name} {spread_mean:-.1f}") # The '+' sign shows +/-
+    print(f"Predicted Spread: {team1_name} {spread_mean:-.1f}")
     print(f"Predicted Total (Over/Under): {team1_avg + team2_avg:.1f}")
+    
+
+    # 3. Calculate the average score differential (the spread).
+    spread_mean = np.mean(score_diffs)
+    
 
     # Determine the winner based on our robust win probability calculation.
     winner_name = team1_name if final_win_prob > 0.5 else team2_name
     return winner_name
-
 def get_pythagorean_win_prob(team1_stats, team2_stats, exponent, league_averages):
     """
     Calculates the win probability for team1 against team2 using Pythagorean Expectation and backtested exponent.
@@ -156,11 +157,10 @@ def main():
     all_teams_csv = getTeams("cbb25.csv")
     if not all_teams_csv: return
 
-    # Pass the `data` function itself so it can be called inside
     league_averages = calculate_league_averages(all_teams_csv, data)
 
-    team1_name = "north-carolina"
-    team2_name = "mississippi"
+    team1_name = "wofford"
+    team2_name = "tennessee"
 
     team1_csv = findTeam(team1_name, "cbb25.csv")
     team1_obj = data(team1_name)
@@ -171,7 +171,6 @@ def main():
         print("\nCould not find all required data for one or both teams. Exiting.")
         return
 
-    # This call now uses the new, more accurate logic inside prepare_team_stats
     team1_stats = prepare_team_stats(team1_csv, team1_obj)
     print(team1_stats)
     team2_stats = prepare_team_stats(team2_csv, team2_obj)
@@ -182,7 +181,7 @@ def main():
 
     simulate_matchup(team1_name, team1_stats,
                      team2_name, team2_stats,
-                     league_averages,4.386,pythag_weight=0.15, num_simulations=200)
+                     league_averages,4.386,pythag_weight=0.10, barthag_weight=0.1, num_simulations=200)
 
 if __name__ == "__main__":
     main()

@@ -43,7 +43,7 @@ def probabilitiesUnweighted(team_stats, opp_stats, possessions):
     }
 
 # Example usage
-teams = getTeams("cbb25")
+teams = getTeams("cbb25.csv")
 team1 = teams[0]
 team2 = teams[1]
 possessions = (float(team1['ADJ_T']) + float(team2['ADJ_T'])) / 2

@@ -2,36 +2,47 @@
 import math
 
 def log5(stat_a, stat_b, league_avg_stat):
-    if (stat_a + stat_b - 2 * stat_a * stat_b) == 0:
-        return (stat_a + stat_b) / 2
-    return (stat_a - stat_a * stat_b) / (stat_a + stat_b - 2 * stat_a * stat_b)
+    """
+    Calculates the expected outcome of a matchup between two entities using the Log5 formula.
+    This helper function is correct and does not need changes.
+    """
+    denominator = stat_a + stat_b - 2 * stat_a * stat_b
+    if denominator == 0:
+        return 0.5
+    return (stat_a - stat_a * stat_b) / denominator
 
 def calculate_four_factors_probabilities(team_stats, opp_stats, league_avg_stats):
     """
-    Adjusts the pre-calculated, normalized probabilities from team_stats using the Log5 formula.
+    CORRECTED: This function now correctly frames all defensive stats as "success rates"
+    before applying the Log5 formula to adjust event OUTCOMES.
     """
-    # 1. Adjust the core, mutually exclusive probabilities
-    adj_p_turnover = log5(team_stats['p_turnover'], 1 - opp_stats['def_TOV_pct'], 1-league_avg_stats['TOV_pct'])
-    adj_p_shooting_foul = log5(team_stats['p_shooting_foul'], opp_stats['def_FTR'], league_avg_stats['FTR'])
-    adj_p_fga = log5(team_stats['p_fga'], 1-opp_stats['def_eFG_pct'], 1-league_avg_stats['eFG_pct'])
+    # --- 1. Use Base Event Probabilities Directly ---
+    # The probability of a turnover, foul, or shot is determined by the team's style.
+    # We take these directly from the pre-calculated, normalized stats.
+    p_turnover = team_stats['p_turnover']
+    p_shooting_foul = team_stats['p_shooting_foul']
+    p_fga = team_stats['p_fga']
 
-    # 2. Re-normalize the adjusted probabilities so they sum to 1.0
-    total_prob = adj_p_turnover + adj_p_shooting_foul + adj_p_fga
-    p_turnover = adj_p_turnover / total_prob
-    p_shooting_foul = adj_p_shooting_foul / total_prob
-    p_fga = adj_p_fga / total_prob
+    # --- 2. Adjust OUTCOME Probabilities Based on Opponent ---
 
-    # 3. Adjust success and other rates
-    adj_orb_pct = log5(team_stats['ORB_pct'], 1 - opp_stats['def_ORB_pct'], league_avg_stats['ORB_pct'])
-    
+    # A) Adjust Shooting Success:
+    # First, calculate the team's base eFG% from its 2P% and 3P%
     team_efg = (team_stats['2P_pct'] * (1 - team_stats['3PAr'])) + (team_stats['3P_pct'] * 1.5 * team_stats['3PAr'])
-    adj_efg = log5(team_efg, opp_stats['def_eFG_pct'], league_avg_stats['eFG_pct'])
     
+    # We compare the offense's ability to score vs. the defense's ability to prevent scores.
+    adj_efg = log5(team_efg, 1 - opp_stats['def_eFG_pct'], 1 - league_avg_stats['eFG_pct'])
+    
+    # Create a scaling factor to adjust the team's 2P% and 3P% up or down.
     scaling_factor = adj_efg / team_efg if team_efg > 0 else 1.0
     p_make_2 = team_stats['2P_pct'] * scaling_factor
     p_make_3 = team_stats['3P_pct'] * scaling_factor
-    
-    # 4. Split FGA and Foul probabilities into their components
+
+    # B) Adjust Rebounding Success:
+    # The defense's success rate at rebounding is (1 - their allowed ORB%).
+    adj_orb_pct = log5(team_stats['ORB_pct'], 1 - opp_stats['def_ORB_pct'], league_avg_stats['ORB_pct'])
+
+    # --- 3. Split Base Event Probabilities into Components ---
+    # We use the UNADJUSTED p_fga and p_shooting_foul for this.
     three_point_attempt_rate = team_stats['3PAr']
     p_fga_3 = p_fga * three_point_attempt_rate
     p_fga_2 = p_fga * (1 - three_point_attempt_rate)
@@ -41,9 +52,19 @@ def calculate_four_factors_probabilities(team_stats, opp_stats, league_avg_stats
     p_foul_on_3 = p_shooting_foul * three_point_attempt_rate
     p_foul_on_2 = p_shooting_foul * (1 - three_point_attempt_rate)
     
+    # --- 4. Return the Final Dictionary ---
     return {
-        'p_fga_2': p_fga_2, 'p_fga_3': p_fga_3, 'p_turnover': p_turnover,
-        'p_foul_on_2': p_foul_on_2, 'p_foul_on_3': p_foul_on_3, 'p_and_one': p_and_one,
-        'p_make_2': min(p_make_2, 0.95), 'p_make_3': min(p_make_3, 0.95),
-        'p_ft_make': team_stats['FT_pct'], 'p_offensive_rebound': adj_orb_pct
+        # Base event probabilities (unadjusted)
+        'p_fga_2': p_fga_2,
+        'p_fga_3': p_fga_3,
+        'p_turnover': p_turnover,
+        'p_foul_on_2': p_foul_on_2,
+        'p_foul_on_3': p_foul_on_3,
+        'p_and_one': p_and_one,
+        
+        # Outcome probabilities (adjusted for opponent)
+        'p_make_2': min(p_make_2, 0.95), # Cap probability
+        'p_make_3': min(p_make_3, 0.95), # Cap probability
+        'p_ft_make': team_stats['FT_pct'], # FT% is considered independent of opponent
+        'p_offensive_rebound': adj_orb_pct
     }

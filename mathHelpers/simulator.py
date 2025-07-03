@@ -108,9 +108,9 @@ def simulate_matchup(team1_name, team2_name, num_simulations=500):
     print(f"\nSimulating matchup: {team1_name} vs {team2_name}")
 
     # Get team stats
-    teams = getTeams("cbb25")
-    team1_stats = findTeam(team1_name, "cbb25")
-    team2_stats = findTeam(team2_name, "cbb25")
+    teams = getTeams("cbb25.csv")
+    team1_stats = findTeam(team1_name, "cbb25.csv")
+    team2_stats = findTeam(team2_name, "cbb25.csv")
 
     if not team1_stats or not team2_stats:
         print("Could not get stats for one or both teams")
@@ -170,9 +170,9 @@ def unweighted_simulate_matchup(team1_name, team2_name, num_simulations=500):
     print(f"\nSimulating matchup: {team1_name} vs {team2_name}")
 
     # Get team stats
-    teams = getTeams("cbb25")
-    team1_stats = findTeam(team1_name, "cbb25")
-    team2_stats = findTeam(team2_name, "cbb25")
+    teams = getTeams("cbb25.csv")
+    team1_stats = findTeam(team1_name, "cbb25.csv")
+    team2_stats = findTeam(team2_name, "cbb25.csv")
 
     if not team1_stats or not team2_stats:
         print("Could not get stats for one or both teams")
@@ -231,9 +231,9 @@ def unweighted_simulate_matchup(team1_name, team2_name, num_simulations=500):
 
 def main():
     team1 = "florida"
-    team2 = "maryland"
+    team2 = "missouri"
     #unweightedResults = unweighted_simulate_matchup(team1,team2)
-    results = unweighted_simulate_matchup(team1, team2)
+    results = simulate_matchup(team1, team2)
     return results
 
 if __name__ == "__main__":

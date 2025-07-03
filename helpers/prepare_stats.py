@@ -49,9 +49,7 @@ def prepare_team_stats(team_csv_data, team_object_data):
         return None
 
 
-# The `calculate_league_averages` function is correct and does not need changes.
 def calculate_league_averages(all_teams_raw_data, get_team_obj_func):
-    # ... (no changes needed here)
     league_totals = {'eFG_pct': 0, 'TOV_pct': 0, 'ORB_pct': 0, 'FTR': 0, 'PPG': 0}
     num_teams = 0
     for team_csv in all_teams_raw_data:

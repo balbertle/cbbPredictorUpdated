@@ -1,6 +1,6 @@
 
 #from mathHelpers.simulator import simulate_matchup
-from mathHelpers.log5sim import simulate_matchup
+from mathHelpers.simulator import simulate_matchup
 import networkx as nx
 import matplotlib.pyplot as plt
 
